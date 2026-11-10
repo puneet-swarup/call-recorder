@@ -22,7 +22,11 @@ import com.callrecorder.model.RecorderConfig
 import com.callrecorder.model.RecordingFormat
 import com.callrecorder.model.RecordingQuality
 import com.callrecorder.settings.SettingsRepository
+import com.callrecorder.update.UpdateChecker
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
 
@@ -45,6 +49,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var recordingsContainer: LinearLayout
 
     private var player: MediaPlayer? = null
+
+ private lateinit var currentVersion: TextView
+ private lateinit var updateStatus: TextView
+ private lateinit var btnCheckUpdates: Button
+ private lateinit var btnOpenRelease: Button
+
+ private val updateExecutor = Executors.newSingleThreadExecutor()
+ private var latestReleaseUrl: String? = null
 
     private val folderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@registerForActivityResult
@@ -95,6 +107,10 @@ class MainActivity : AppCompatActivity() {
         checkAutoStart = findViewById(R.id.checkAutoStart)
         recordingsEmpty = findViewById(R.id.recordingsEmpty)
         recordingsContainer = findViewById(R.id.recordingsContainer)
+        currentVersion = findViewById(R.id.currentVersion)
+        updateStatus = findViewById(R.id.updateStatus)
+        btnCheckUpdates = findViewById(R.id.btnCheckUpdates)
+        btnOpenRelease = findViewById(R.id.btnOpenRelease)
     }
 
     private fun buildOptions() {
@@ -139,6 +155,61 @@ class MainActivity : AppCompatActivity() {
         checkVoip.setOnCheckedChangeListener { _, c -> settings.save(settings.load().copy(recordVoipCalls = c)) }
         checkAutoStart.setOnCheckedChangeListener { _, c -> settings.save(settings.load().copy(autoStart = c)) }
         btnToggleService.setOnClickListener { toggleService() }
+        btnCheckUpdates.setOnClickListener { checkForUpdates() }
+        btnOpenRelease.setOnClickListener { openReleasePage() }
+    }
+
+    private fun checkForUpdates() {
+        btnCheckUpdates.isEnabled = false
+        updateStatus.text = getString(R.string.updates_checking)
+        btnOpenRelease.visibility = View.GONE
+
+        updateExecutor.execute {
+            val fetcher = UpdateChecker.Fetcher { url: String -> httpGet(url) }
+            val checker = UpdateChecker(BuildConfig.VERSION_CODE, fetcher)
+            val result = checker.check()
+            runOnUiThread {
+                btnCheckUpdates.isEnabled = true
+                when (result) {
+                    is UpdateChecker.Result.UpToDate -> {
+                        updateStatus.text = getString(R.string.updates_up_to_date)
+                        latestReleaseUrl = null
+                        btnOpenRelease.visibility = View.GONE
+                    }
+                    is UpdateChecker.Result.UpdateAvailable -> {
+                        updateStatus.text = getString(R.string.updates_available, result.latestVersion)
+                        latestReleaseUrl = result.releaseUrl
+                        btnOpenRelease.visibility = View.VISIBLE
+                    }
+                    is UpdateChecker.Result.Failure -> {
+                        updateStatus.text = getString(R.string.updates_error)
+                        latestReleaseUrl = null
+                        btnOpenRelease.visibility = View.GONE
+                    }
+                }
+            }
+        }
+    }
+
+    private fun openReleasePage() {
+        val url = latestReleaseUrl ?: UpdateChecker.RELEASES_PAGE
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
+
+    private fun httpGet(url: String): String {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.setRequestProperty("Accept", "application/vnd.github+json")
+        connection.setRequestProperty("User-Agent", "call-recorder")
+        connection.connectTimeout = 10_000
+        connection.readTimeout = 10_000
+        return try {
+            val code = connection.responseCode
+            if (code !in 200..299) throw IllegalStateException("HTTP " + code)
+            connection.inputStream.bufferedReader().use { it.readText() }
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun toggleService() {
@@ -163,7 +234,19 @@ class MainActivity : AppCompatActivity() {
         checkCellular.isChecked = config.recordCellularCalls
         checkVoip.isChecked = config.recordVoipCalls
         checkAutoStart.isChecked = config.autoStart
-        syncRadioGroup(formatGroup, config.format.id)
+        currentVersion.text = getString(
+ R.string.updates_current,
+ BuildConfig.VERSION_NAME,
+ BuildConfig.VERSION_CODE,
+ )
+
+ currentVersion.text = getString(
+ R.string.updates_current,
+ BuildConfig.VERSION_NAME,
+ BuildConfig.VERSION_CODE,
+ )
+
+ syncRadioGroup(formatGroup, config.format.id)
         syncRadioGroup(qualityGroup, config.quality.id)
         refreshRecordings(config)
     }

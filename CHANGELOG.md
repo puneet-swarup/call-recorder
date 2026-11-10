@@ -29,3 +29,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Removed
 - Unused `WAKE_LOCK` and `PACKAGE_USAGE_STATS` permissions (battery and least-privilege cleanup).
+
+## [1.2.0] - 2026-11-10
+
+### Added
+- In-app "Check for updates" card: queries the GitHub Releases API, compares
+ the published tag against the installed versionCode, and reports either
+ "you are on the latest version" or "version X.Y.Z is available" with a
+ button that opens the release page.
+- UpdateChecker - dependency-free, unit-tested class with an injectable
+ fetcher so the GitHub call is testable offline (9 new tests).
+- REQUEST_INSTALL_PACKAGES permission, declared ahead of a future in-app
+ installer.
+
+### Changed
+- Version bumped to 1.2.0 (versionCode 3).
+
+### Known limitations
+- The check is manual only (button-driven). No background polling.
+- The release page opens in the browser; the user downloads and sideloads the
+ APK. Android does not allow silent self-update outside Play or enterprise
+ provisioning.

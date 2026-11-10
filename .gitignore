@@ -37,3 +37,4 @@ src/main/java/com/callrecorder/BuildConfig.kt
 node_modules/
 package.json
 package-lock.json
+UPDATE_MECHANISM.md 
