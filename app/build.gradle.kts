@@ -126,3 +126,15 @@ dependencies {
     testImplementation("androidx.test:core:1.6.1")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.21")
 }
+
+// Keep all Kotlin artifacts aligned with the Kotlin Gradle plugin (2.0.21).
+// Test libraries compiled against a newer Kotlin emit metadata the 2.0 compiler
+// cannot read ("incompatible version of Kotlin"), so constrain the whole group.
+configurations.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlin") {
+            useVersion("2.0.21")
+            because("Kotlin stdlib/test metadata must match the Kotlin Gradle plugin")
+        }
+    }
+}

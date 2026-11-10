@@ -7,6 +7,14 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+    ignore:
+      # The Kotlin Gradle plugin is pinned at 2.0.21 (see app/build.gradle.kts).
+      # Bumping stdlib/test artifacts ahead of the compiler breaks the build with
+      # "Module was compiled with an incompatible version of Kotlin".
+      - dependency-name: "org.jetbrains.kotlin:*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
 
   - package-ecosystem: "github-actions"
     directory: "/"
