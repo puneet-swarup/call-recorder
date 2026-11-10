@@ -1,4 +1,4 @@
-﻿package com.callrecorder
+package com.callrecorder
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -29,11 +29,15 @@ class CallRecorderService : Service() {
         coordinator = RecordingCoordinator(MediaRecorderAudioRecorder(), repository)
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification(getString(R.string.notification_idle)))
+        isRunning = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val state = intent?.getStringExtra(EXTRA_STATE) ?: return START_STICKY
-        val number = intent?.getStringExtra(EXTRA_PHONE_NUMBER)
+        val state = intent?.getStringExtra(EXTRA_STATE)
+        if (state == null) {
+            return START_STICKY
+        }
+        val number = intent.getStringExtra(EXTRA_PHONE_NUMBER)
         when (state) {
             TelephonyManager.EXTRA_STATE_RINGING -> {
                 currentPhoneNumber = number
@@ -51,19 +55,20 @@ class CallRecorderService : Service() {
             TelephonyManager.EXTRA_STATE_IDLE -> {
                 if (coordinator.isRecording()) {
                     coordinator.stopRecording()
-                    updateNotification(getString(R.string.notification_idle))
                 }
                 currentPhoneNumber = null
                 currentCallType = CallType.UNKNOWN
+                updateNotification(getString(R.string.notification_idle))
             }
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent): IBinder? = null
 
     override fun onDestroy() {
         if (coordinator.isRecording()) coordinator.stopRecording()
+        isRunning = false
         super.onDestroy()
     }
 
@@ -85,7 +90,7 @@ class CallRecorderService : Service() {
         return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
@@ -97,6 +102,10 @@ class CallRecorderService : Service() {
     }
 
     companion object {
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+
         const val EXTRA_STATE = "state"
         const val EXTRA_PHONE_NUMBER = "phone_number"
         const val CHANNEL_ID = "call_recorder_channel"
@@ -112,5 +121,3 @@ class CallRecorderService : Service() {
         }
     }
 }
-
-

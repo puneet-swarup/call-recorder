@@ -1,17 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Call Recorder</string>
+
     <string name="notification_channel_name">Call Recording</string>
-    <string name="notification_title">Recording call</string>
-    <string name="notification_recording">Recording in progress</string>
-    <string name="notification_idle">Ready to record</string>
-    <string name="btn_start">Start Service</string>
-    <string name="btn_stop">Stop Service</string>
-    <string name="btn_select_folder">Select Storage Folder</string>
-    <string name="label_status">Status</string>
-    <string name="label_format">Format</string>
-    <string name="label_quality">Quality</string>
-    <string name="label_folder">Storage Folder</string>
-    <string name="permissions_needed">Permissions required to record calls</string>
-    <string name="grant_permissions">Grant Permissions</string>
+    <string name="notification_title">Call Recorder</string>
+    <string name="notification_recording">Recording call</string>
+    <string name="notification_idle">Ready, waiting for a call</string>
+
+    <string name="status_title">Status</string>
+    <string name="status_ready">Ready to record</string>
+    <string name="status_recording">Recording now</string>
+    <string name="status_permissions_missing">Permissions needed</string>
+
+    <string name="permissions_needed">Call Recorder needs microphone, phone state and notification access to record calls automatically.</string>
+    <string name="grant_permissions">Grant permissions</string>
+    <string name="permissions_granted">All permissions granted</string>
+
+    <string name="storage_title">Where recordings are saved</string>
+    <string name="storage_app_private">App-private storage, not visible in Files</string>
+    <string name="storage_choose">Choose folder</string>
+    <string name="storage_reset">Use app-private storage</string>
+    <string name="storage_hint">Pick a folder you can open from your Files app, or leave it on app-private storage.</string>
+    <string name="storage_picker_title">Choose where to save recordings</string>
+
+    <string name="format_title">Recording format</string>
+    <string name="format_hint">M4A gives the best balance of quality and size.</string>
+
+    <string name="quality_title">Recording quality</string>
+    <string name="quality_hint">Higher quality means larger files.</string>
+
+    <string name="behaviour_title">Behaviour</string>
+    <string name="behaviour_record_cellular">Record phone calls</string>
+    <string name="behaviour_record_voip">Record VoIP and WhatsApp calls, best effort</string>
+    <string name="behaviour_auto_start">Start automatically after reboot</string>
+
+    <string name="recordings_title">Recordings</string>
+    <string name="recordings_empty">No recordings yet. They will appear here after your first call.</string>
+
+    <string name="btn_start">Enable call recording</string>
+    <string name="btn_stop">Disable call recording</string>
+
+    <string name="playback_error">Could not play this recording</string>
 </resources>
