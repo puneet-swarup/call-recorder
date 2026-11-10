@@ -50,3 +50,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - The release page opens in the browser; the user downloads and sideloads the
  APK. Android does not allow silent self-update outside Play or enterprise
  provisioning.
+
+### Release notes
+- v1.2.0 published 2026-11-10: https://github.com/puneet-swarup/call-recorder/releases/tag/v1.2.0
+ (app-release.apk 2,176,955 bytes, signed, sha256 + BUILD_INFO.txt attached)
+- v1.1.0 was never tagged; its changes shipped to main inside v1.2.0.

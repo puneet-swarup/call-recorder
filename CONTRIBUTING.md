@@ -29,3 +29,26 @@ Commit messages should follow [Conventional Commits](https://www.conventionalcom
 ## Reporting bugs
 
 Open an issue using the bug report template. Please include the device ANDroid version, app version, and a clear reproduction path.
+
+## Release checklist
+
+Every user-visible change that bumps `versionCode` / `versionName` in
+`app/build.gradle.kts` **must** be followed by a tag, otherwise the release
+workflow never runs and no APK is published.
+
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
+2. Add a `CHANGELOG.md` entry under the new version.
+3. Commit and push to `main`; wait for CI to go green.
+4. Tag the merged commit and push the tag:
+
+   ```bash
+   git tag -a vX.Y.Z -m "Call Recorder X.Y.Z"
+   git push origin vX.Y.Z
+   ```
+
+5. Confirm the `Release` workflow run succeeds and the GitHub Release has
+   `app-release.apk`, `app-release.apk.sha256` and `BUILD_INFO.txt`.
+6. Verify the published APK (`apksigner verify`, `zipalign -c -v 4`).
+
+A version bump without a tag is a silent release: the code ships to `main`
+but no signed APK reaches users.
