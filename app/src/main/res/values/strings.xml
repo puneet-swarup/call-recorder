@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Call Recorder</string>
+    <string name="notification_channel_name">Call Recording</string>
+    <string name="notification_title">Recording call</string>
+    <string name="notification_recording">Recording in progress</string>
+    <string name="notification_idle">Ready to record</string>
+    <string name="btn_start">Start Service</string>
+    <string name="btn_stop">Stop Service</string>
+    <string name="btn_select_folder">Select Storage Folder</string>
+    <string name="label_status">Status</string>
+    <string name="label_format">Format</string>
+    <string name="label_quality">Quality</string>
+    <string name="label_folder">Storage Folder</string>
+    <string name="permissions_needed">Permissions required to record calls</string>
+    <string name="grant_permissions">Grant Permissions</string>
+</resources>

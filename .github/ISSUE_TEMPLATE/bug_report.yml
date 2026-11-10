@@ -1,0 +1,53 @@
+name: Bug Report
+description: Report something that is not working correctly
+title: "[Bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear description of the bug.
+      placeholder: When I record a call and the app is in the background, it...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1. Install the app ...
+        2. Make a call ...
+        3. See error ...
+    validations:
+      required: true
+
+  - type: input
+    id: android_version
+    attributes:
+      label: Android version
+      placeholder: "E.g. Android 16"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device / manufacturer
+      options:
+        - Google Pixel
+        - Samsung
+        - OnePlus
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I am using the latest release
