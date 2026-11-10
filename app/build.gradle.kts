@@ -1,4 +1,4 @@
-﻿import java.util.Properties
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -122,7 +122,7 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
-    testImplementation("org.mockito:mockito-core:5.14.0")
+    testImplementation("org.mockito:mockito-core:5.24.0")
     testImplementation("androidx.test:core:1.6.1")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.21")
 }
