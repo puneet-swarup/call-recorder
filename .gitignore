@@ -32,3 +32,8 @@ VALIDATION_REPORT.md
 src/main/java/com/callrecorder/BuildConfig.kt
 *.apk
 *.aab
+
+# Local helper tooling (libsodium sealing, API scripts)
+node_modules/
+package.json
+package-lock.json
