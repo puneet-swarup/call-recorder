@@ -103,3 +103,7 @@ A self-signed debug keystore (`release.keystore`) is provided for local testing 
 
 Both commands should succeed. The APK is signed with the v2 scheme (verified on the
 built artifact), is zip-aligned (verified), and targets Android 16 / API 36.
+
+## License
+
+Licensed under [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/). Commercial use requires a licence — write to puneetswarup@gmail.com.
