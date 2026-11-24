@@ -5,6 +5,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-11
+
+### Added
+- **Share / export recordings**: per-recording and share-all buttons expose files
+  via `FileProvider` and `ACTION_SEND` / `ACTION_SEND_MULTIPLE`; an optional
+  configurable recipient email is pre-filled.
+- **Auto-share on completion**: recordings can be shared automatically right after
+  a call ends (opt-in), using the configured recipient.
+- **Minimise mode**: hides the app from the recents list (custom task description)
+  while keeping the foreground-service notification as the entry point.
+
+### Fixed
+- Recording enable state now persists across app close and reboot
+  (`recorderEnabled` flag is the single source of truth; `BootReceiver` respects it).
+- Enable button responds on the first tap (optimistic UI, driven by persisted state).
+- `minSdk` lowered 29 to 26 with API-level gating of foreground-service and
+  notification paths.
+- Audio source fallback chain (`VOICE_CALL` to `VOICE_COMMUNICATION` to `MIC`) instead
+  of a single hard-coded source.
+- `BootReceiver` now also restarts on `MY_PACKAGE_REPLACED` and is direct-boot aware.
+- Recordings storage unified under `filesDir/recordings` so `FileProvider` sharing
+  resolves correctly.
+
+### Tests
+- Added `SettingsRepositoryTest` (Robolectric) for persistence and field round-trip.
+- Added coordinator test for `currentRecordingPath()`.
+- Full suite: **52 tests passing, 0 failures**.
+
 ## [1.0.0] - 2026-11-10
 
 ### Added

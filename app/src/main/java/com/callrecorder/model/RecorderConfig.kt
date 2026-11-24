@@ -8,4 +8,8 @@ data class RecorderConfig(
     val recordVoipCalls: Boolean = true,
     val encryptionEnabled: Boolean = false,
     val autoStart: Boolean = true,
+ val recorderEnabled: Boolean = false,
+ val shareRecipient: String? = null,
+ val autoShareOnComplete: Boolean = false,
+ val minimiseMode: Boolean = false,
 )

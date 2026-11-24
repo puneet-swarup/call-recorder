@@ -47,6 +47,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var checkAutoStart: CheckBox
     private lateinit var recordingsEmpty: TextView
     private lateinit var recordingsContainer: LinearLayout
+    private lateinit var shareRecipient: android.widget.EditText
+    private lateinit var btnSaveRecipient: Button
+    private lateinit var checkAutoShare: CheckBox
+    private lateinit var btnShareAll: Button
+    private lateinit var checkMinimise: CheckBox
 
     private var player: MediaPlayer? = null
 
@@ -81,7 +86,13 @@ class MainActivity : AppCompatActivity() {
         buildOptions()
         wireListeners()
         requestPermissionsIfNeeded()
+        applyMinimiseMode(settings.load().minimiseMode)
         refreshUi()
+    }
+
+    override fun onPause() {
+        if (settings.load().minimiseMode) applyMinimiseMode(true)
+        super.onPause()
     }
 
     override fun onDestroy() {
@@ -111,6 +122,11 @@ class MainActivity : AppCompatActivity() {
         updateStatus = findViewById(R.id.updateStatus)
         btnCheckUpdates = findViewById(R.id.btnCheckUpdates)
         btnOpenRelease = findViewById(R.id.btnOpenRelease)
+        shareRecipient = findViewById(R.id.shareRecipient)
+        btnSaveRecipient = findViewById(R.id.btnSaveRecipient)
+        checkAutoShare = findViewById(R.id.checkAutoShare)
+        btnShareAll = findViewById(R.id.btnShareAll)
+        checkMinimise = findViewById(R.id.checkMinimise)
     }
 
     private fun buildOptions() {
@@ -154,9 +170,19 @@ class MainActivity : AppCompatActivity() {
         checkCellular.setOnCheckedChangeListener { _, c -> settings.save(settings.load().copy(recordCellularCalls = c)) }
         checkVoip.setOnCheckedChangeListener { _, c -> settings.save(settings.load().copy(recordVoipCalls = c)) }
         checkAutoStart.setOnCheckedChangeListener { _, c -> settings.save(settings.load().copy(autoStart = c)) }
-        btnToggleService.setOnClickListener { toggleService() }
+        btnToggleService.setOnClickListener { onToggleClicked() }
         btnCheckUpdates.setOnClickListener { checkForUpdates() }
         btnOpenRelease.setOnClickListener { openReleasePage() }
+
+        btnSaveRecipient.setOnClickListener { saveRecipient() }
+        checkAutoShare.setOnCheckedChangeListener { _, c ->
+            settings.save(settings.load().copy(autoShareOnComplete = c))
+        }
+        btnShareAll.setOnClickListener { shareAllRecordings() }
+        checkMinimise.setOnCheckedChangeListener { _, c ->
+            settings.save(settings.load().copy(minimiseMode = c))
+            applyMinimiseMode(c)
+        }
     }
 
     private fun checkForUpdates() {
@@ -212,39 +238,110 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun toggleService() {
-        if (CallRecorderService.isRunning) {
-            stopService(Intent(this, CallRecorderService::class.java))
-        } else {
+    private fun onToggleClicked() {
+        val nowEnabled = !settings.isRecorderEnabled()
+        settings.setRecorderEnabled(nowEnabled)
+        btnToggleService.isEnabled = false
+        if (nowEnabled) {
             ContextCompat.startForegroundService(this, Intent(this, CallRecorderService::class.java))
+        } else {
+            stopService(Intent(this, CallRecorderService::class.java))
         }
         refreshUi()
+        btnToggleService.post { btnToggleService.isEnabled = true }
+    }
+
+    private fun saveRecipient() {
+        val value = shareRecipient.text.toString().trim()
+        settings.save(settings.load().copy(shareRecipient = value.ifBlank { null }))
+        toast(getString(R.string.sharing_saved))
+    }
+
+    private fun shareAllRecordings() {
+        val files = listRecordings().take(20)
+        if (files.isEmpty()) {
+            toast(getString(R.string.recordings_empty))
+            return
+        }
+        shareFiles(files)
+    }
+
+    private fun shareFiles(files: List<File>) {
+        if (files.isEmpty()) return
+        val uris = ArrayList(files.map { fileToShareUri(it) })
+        val recipient = settings.load().shareRecipient
+        val subject = getString(R.string.sharing_title)
+
+        val intent = if (uris.size == 1) {
+            Intent(Intent.ACTION_SEND).apply {
+                type = "audio/*"
+                putExtra(Intent.EXTRA_STREAM, uris[0])
+            }
+        } else {
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "audio/*"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+            }
+        }
+        intent.putExtra(Intent.EXTRA_SUBJECT, subject)
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        if (!recipient.isNullOrBlank()) {
+            intent.putExtra(Intent.EXTRA_EMAIL, arrayOf(recipient))
+        }
+
+        val chooser = Intent.createChooser(intent, subject)
+        try {
+            startActivity(chooser)
+        } catch (_: android.content.ActivityNotFoundException) {
+            toast(getString(R.string.sharing_no_app))
+        }
+    }
+
+    private fun fileToShareUri(file: File): Uri {
+        // Recordings live in app-private storage, so they must be exposed
+        // through a content provider for other apps to read them.
+        return androidx.core.content.FileProvider.getUriForFile(
+            this,
+            packageName + ".recordings",
+            file,
+        )
+    }
+
+    private fun applyMinimiseMode(enabled: Boolean) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            setTaskDescription(
+                android.app.ActivityManager.TaskDescription(
+                    if (enabled) " " else getString(R.string.app_name),
+                ),
+            )
+        }
     }
 
     private fun refreshUi() {
         val config = settings.load()
         val granted = hasPermissions()
         permissionsCard.visibility = if (granted) View.GONE else View.VISIBLE
-        statusValue.text = getString(if (granted) R.string.status_ready else R.string.status_permissions_missing)
+        statusValue.text = when {
+            !granted -> getString(R.string.status_permissions_missing)
+            settings.isRecorderEnabled() -> getString(R.string.status_ready)
+            else -> getString(R.string.status_disabled)
+        }
         statusSummary.text = getString(R.string.format_title) + ": " + config.format.label + "  \u00b7  " + getString(R.string.quality_title) + ": " + config.quality.label
         val folderLabel = config.storageFolderUri?.let { friendlyFolder(it) } ?: getString(R.string.storage_app_private)
         statusFolder.text = getString(R.string.storage_title) + ": " + folderLabel
         storagePath.text = folderLabel
-        btnToggleService.setText(if (CallRecorderService.isRunning) R.string.btn_stop else R.string.btn_start)
+        btnToggleService.setText(if (settings.isRecorderEnabled()) R.string.btn_stop else R.string.btn_start)
         checkCellular.isChecked = config.recordCellularCalls
         checkVoip.isChecked = config.recordVoipCalls
         checkAutoStart.isChecked = config.autoStart
+        shareRecipient.setText(config.shareRecipient ?: "")
+        checkAutoShare.isChecked = config.autoShareOnComplete
+        checkMinimise.isChecked = config.minimiseMode
         currentVersion.text = getString(
- R.string.updates_current,
- BuildConfig.VERSION_NAME,
- BuildConfig.VERSION_CODE,
- )
-
- currentVersion.text = getString(
- R.string.updates_current,
- BuildConfig.VERSION_NAME,
- BuildConfig.VERSION_CODE,
- )
+            R.string.updates_current,
+            BuildConfig.VERSION_NAME,
+            BuildConfig.VERSION_CODE,
+        )
 
  syncRadioGroup(formatGroup, config.format.id)
         syncRadioGroup(qualityGroup, config.quality.id)
@@ -284,14 +381,19 @@ class MainActivity : AppCompatActivity() {
                 text = "Play"
                 setOnClickListener { playFile(file) }
             }
+            val share = Button(this).apply {
+                text = "Share"
+                setOnClickListener { shareFiles(listOf(file)) }
+            }
             row.addView(label)
             row.addView(play)
+            row.addView(share)
             recordingsContainer.addView(row)
         }
     }
 
     private fun listRecordings(): List<File> {
-        val dir = File(getDir("recordings", MODE_PRIVATE), "")
+        val dir = File(java.io.File(filesDir, "recordings"), "")
         val files = dir.listFiles { f -> f.isFile && !f.name.startsWith(".") } ?: emptyArray()
         return files.sortedByDescending { it.lastModified() }
     }

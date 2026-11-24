@@ -2,7 +2,7 @@
 
 Native Kotlin Android app that automatically records phone calls in the background
 without any in-call interaction. Built against `compileSdk`/`targetSdk` 36 (Android 16),
-`minSdk` 29.
+`minSdk` 26 (Android 8.0).
 
 ## Features
 
@@ -12,7 +12,9 @@ without any in-call interaction. Built against `compileSdk`/`targetSdk` 36 (Andr
   with High / Medium / Low presets (bitrate + sample rate).
 - **Configurable storage folder**: SAF tree URI (user-picked folder), MediaStore or
   app-private fallback, deterministic file naming (`yyyy-MM-dd_HHmmss_TYPE_NUMBER.ext`).
-- **Restart on boot** (`BootReceiver`, toggleable via `autoStart`).
+- **Restart on boot / after update** (`BootReceiver`; respects the persisted `recorderEnabled` flag).
+- **Share / export**: per-recording and share-all buttons via `FileProvider` + `ACTION_SEND`, with an optional pre-filled recipient and opt-in auto-share after each call.
+- **Minimise mode**: de-emphasises the app in recents; the foreground notification remains the entry point.
 - **Minimal UI**: permission onboarding + status summary + start/stop service.
 - **Full unit-test coverage** of domain logic (state machines, naming, storage, coordinator).
 
@@ -63,10 +65,10 @@ gradlew.bat :app:testDebugUnitTest :app:unitCoverageReport :app:assembleDebug
 
 ## Test status
 
-- Unit tests: **39 passing, 0 failures** across 8 test classes
+- Unit tests: **52 passing, 0 failures** across 9 test classes
   (`CallStateTrackerTest`, `RecordingFormatTest`, `RecordingQualityTest`,
   `RecordingRepositoryTest`, `RecordingStateMachineTest`, `RecordingCoordinatorTest`,
-  `FileNamingPolicyTest`, `StorageConfigTest`).
+  `FileNamingPolicyTest`, `StorageConfigTest`, `SettingsRepositoryTest`).
 - JaCoCo overall instruction coverage: **48%** (pure domain logic is near-100%; the
   uncovered portion is the Android-framework glue — service, activity, receivers,
   `MediaRecorder` wrapper — which requires instrumentation tests / a device).

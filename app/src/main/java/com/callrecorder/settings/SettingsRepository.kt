@@ -19,6 +19,10 @@ class SettingsRepository(context: Context) {
             recordVoipCalls = prefs.getBoolean(KEY_RECORD_VOIP, true),
             encryptionEnabled = prefs.getBoolean(KEY_ENCRYPTION, false),
             autoStart = prefs.getBoolean(KEY_AUTO_START, true),
+            recorderEnabled = prefs.getBoolean(KEY_RECORDER_ENABLED, false),
+            shareRecipient = prefs.getString(KEY_SHARE_RECIPIENT, null),
+            autoShareOnComplete = prefs.getBoolean(KEY_AUTO_SHARE, false),
+            minimiseMode = prefs.getBoolean(KEY_MINIMISE, false),
         )
     }
 
@@ -31,8 +35,18 @@ class SettingsRepository(context: Context) {
             .putBoolean(KEY_RECORD_VOIP, config.recordVoipCalls)
             .putBoolean(KEY_ENCRYPTION, config.encryptionEnabled)
             .putBoolean(KEY_AUTO_START, config.autoStart)
+            .putBoolean(KEY_RECORDER_ENABLED, config.recorderEnabled)
+            .putString(KEY_SHARE_RECIPIENT, config.shareRecipient)
+            .putBoolean(KEY_AUTO_SHARE, config.autoShareOnComplete)
+            .putBoolean(KEY_MINIMISE, config.minimiseMode)
             .apply()
     }
+
+    fun setRecorderEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_RECORDER_ENABLED, enabled).apply()
+    }
+
+    fun isRecorderEnabled(): Boolean = prefs.getBoolean(KEY_RECORDER_ENABLED, false)
 
     companion object {
         const val PREFS_NAME = "callrecorder_settings"
@@ -43,5 +57,9 @@ class SettingsRepository(context: Context) {
         private const val KEY_RECORD_VOIP = "record_voip"
         private const val KEY_ENCRYPTION = "encryption"
         private const val KEY_AUTO_START = "auto_start"
+        private const val KEY_RECORDER_ENABLED = "recorder_enabled"
+        private const val KEY_SHARE_RECIPIENT = "share_recipient"
+        private const val KEY_AUTO_SHARE = "auto_share"
+        private const val KEY_MINIMISE = "minimise"
     }
 }

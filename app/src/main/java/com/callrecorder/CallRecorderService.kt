@@ -21,6 +21,7 @@ class CallRecorderService : Service() {
     private lateinit var settings: SettingsRepository
     private var currentPhoneNumber: String? = null
     private var currentCallType: CallType = CallType.UNKNOWN
+    private var lastCompletedPath: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -53,8 +54,13 @@ class CallRecorderService : Service() {
                 }
             }
             TelephonyManager.EXTRA_STATE_IDLE -> {
+                val stoppedPath = coordinator.currentRecordingPath()
                 if (coordinator.isRecording()) {
                     coordinator.stopRecording()
+                }
+                if (stoppedPath != null) {
+                    lastCompletedPath = stoppedPath
+                    maybeAutoShare(stoppedPath)
                 }
                 currentPhoneNumber = null
                 currentCallType = CallType.UNKNOWN
@@ -73,7 +79,7 @@ class CallRecorderService : Service() {
     }
 
     private fun getPrivateRecordingsDir(): File {
-        val dir = File(getDir("recordings", MODE_PRIVATE), "")
+        val dir = File(java.io.File(filesDir, "recordings"), "")
         if (!dir.exists()) dir.mkdirs()
         return dir
     }
@@ -99,6 +105,32 @@ class CallRecorderService : Service() {
     private fun updateNotification(text: String) {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(NOTIFICATION_ID, buildNotification(text))
+    }
+
+    private fun maybeAutoShare(filePath: String) {
+        val config = settings.load()
+        if (!config.autoShareOnComplete) return
+        val file = File(filePath)
+        if (!file.exists()) return
+        try {
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                packageName + ".recordings",
+                file,
+            )
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "audio/*"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (!config.shareRecipient.isNullOrBlank()) putExtra(Intent.EXTRA_EMAIL, arrayOf(config.shareRecipient))
+            }
+            val chooser = Intent.createChooser(send, getString(R.string.sharing_title)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(chooser)
+        } catch (e: Exception) {
+            android.util.Log.w("CallRecorderService", "auto-share failed", e)
+        }
     }
 
     companion object {

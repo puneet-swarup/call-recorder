@@ -308,5 +308,90 @@
                 android:text="@string/updates_open_release" />
         </LinearLayout>
 
+        <!-- SHARING CARD -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="16dp"
+            android:padding="16dp"
+            android:background="?attr/colorSurface"
+            android:elevation="2dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/sharing_title"
+                android:textStyle="bold"
+                android:textSize="18sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/sharing_hint"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/shareRecipient"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="@string/sharing_recipient_hint"
+                android:inputType="textEmailAddress"
+                android:maxLines="1" />
+
+            <Button
+                android:id="@+id/btnSaveRecipient"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/sharing_save_recipient" />
+
+            <CheckBox
+                android:id="@+id/checkAutoShare"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/sharing_auto" />
+
+            <Button
+                android:id="@+id/btnShareAll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/sharing_share_all" />
+        </LinearLayout>
+
+        <!-- MINIMISE CARD -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="16dp"
+            android:padding="16dp"
+            android:background="?attr/colorSurface"
+            android:elevation="2dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/minimise_title"
+                android:textStyle="bold"
+                android:textSize="18sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/minimise_hint"
+                android:textSize="12sp" />
+
+            <CheckBox
+                android:id="@+id/checkMinimise"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/minimise_toggle" />
+        </LinearLayout>
+
     </LinearLayout>
 </ScrollView>

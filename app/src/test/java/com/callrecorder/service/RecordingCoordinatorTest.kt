@@ -78,7 +78,17 @@ class RecordingCoordinatorTest {
         Assert.assertFalse(coordinator.isRecording())
     }
 
-    private class FakeRecorder(
+       @Test
+    fun currentRecordingPathReflectsActiveRecording() {
+        val coordinator = RecordingCoordinator(FakeRecorder(), repository)
+        Assert.assertNull(coordinator.currentRecordingPath())
+        coordinator.startRecording(config, CallType.INCOMING, "1")
+        Assert.assertNotNull(coordinator.currentRecordingPath())
+        coordinator.stopRecording()
+        Assert.assertNull(coordinator.currentRecordingPath())
+    }
+
+ private class FakeRecorder(
         private val throwOnNextStart: Boolean = false,
     ) : AudioRecorder {
         var started = false

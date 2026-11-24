@@ -46,6 +46,9 @@ class RecordingCoordinator(
 
     fun isRecording(): Boolean = stateMachine.isRecording()
 
+ fun currentRecordingPath(): String? =
+ (stateMachine.state as? com.callrecorder.recorder.RecorderState.Recording)?.filePath
+
     sealed class Result {
         data class Started(val filePath: String) : Result()
         object Stopped : Result()
