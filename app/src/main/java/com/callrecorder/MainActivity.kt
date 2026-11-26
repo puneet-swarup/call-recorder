@@ -64,6 +64,7 @@ class MainActivity : AppCompatActivity() {
  private lateinit var btnOpenRelease: Button
 
  private val updateExecutor = Executors.newSingleThreadExecutor()
+ private val ioExecutor = Executors.newSingleThreadExecutor()
  private var latestReleaseUrl: String? = null
 
     private val folderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -441,6 +442,7 @@ class MainActivity : AppCompatActivity() {
  syncRadioGroup(formatGroup, config.format.id)
         syncRadioGroup(qualityGroup, config.quality.id)
         refreshRecordings(config)
+        window.decorView.post { appendFolderRecordingsAsync(config) }
     }
 
     private fun syncRadioGroup(group: RadioGroup, tagValue: String) {
@@ -485,29 +487,54 @@ class MainActivity : AppCompatActivity() {
             row.addView(share)
             recordingsContainer.addView(row)
         }
-        appendFolderRecordings(config)
     }
 
-    /** Recordings that already sit in the folder the user picked. */
-    private fun appendFolderRecordings(config: RecorderConfig) {
+    /**
+     * Recordings that already sit in the folder the user picked.
+     *
+     * This must never run on the UI thread: DocumentFile.listFiles() is a
+     * ContentProvider round trip per entry and on a large folder it hangs the
+     * first frame, which is what made the app sit on the splash screen.
+     */
+    private fun appendFolderRecordingsAsync(config: RecorderConfig) {
         val treeUri = config.storageFolderUri ?: return
-        val docs = try {
-            com.callrecorder.storage.SafStore.listAudio(this, Uri.parse(treeUri))
+        val uri = try {
+            Uri.parse(treeUri)
         } catch (_: Exception) {
-            emptyList()
+            return
         }
-        if (docs.isEmpty()) return
+        if (!hasFolderPermission(uri)) return
 
+        ioExecutor.execute {
+            val items = try {
+                com.callrecorder.storage.SafStore.listAudio(this, uri)
+                    .take(30)
+                    .mapNotNull { doc -> doc.name?.let { doc.uri to it } }
+            } catch (_: Throwable) {
+                emptyList()
+            }
+            if (items.isEmpty()) return@execute
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                addFolderRows(items)
+            }
+        }
+    }
+
+    private fun hasFolderPermission(uri: Uri): Boolean = try {
+        contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun addFolderRows(items: List<Pair<Uri, String>>) {
         val header = TextView(this).apply {
-            text = friendlyFolder(treeUri)
+            text = getString(R.string.storage_title)
             textSize = 13f
             setPadding(0, 16, 0, 0)
         }
         recordingsContainer.addView(header)
-
-        docs.take(20).forEach { doc ->
-            val name = doc.name ?: return@forEach
-            val uri = doc.uri
+        items.forEach { (uri, name) ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(0, 8, 0, 8)
