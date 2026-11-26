@@ -47,6 +47,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var checkAutoStart: CheckBox
     private lateinit var checkShizuku: CheckBox
     private lateinit var recordingsEmpty: TextView
+    private lateinit var btnTestRecording: Button
+    private lateinit var statusVersion: TextView
     private lateinit var recordingsContainer: LinearLayout
     private lateinit var shareRecipient: android.widget.EditText
     private lateinit var btnSaveRecipient: Button
@@ -97,6 +99,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        stopTestRecording()
         player?.release()
         player = null
         super.onDestroy()
@@ -119,6 +122,8 @@ class MainActivity : AppCompatActivity() {
         checkAutoStart = findViewById(R.id.checkAutoStart)
         checkShizuku = findViewById(R.id.checkShizuku)
         recordingsEmpty = findViewById(R.id.recordingsEmpty)
+        btnTestRecording = findViewById(R.id.btnTestRecording)
+        statusVersion = findViewById(R.id.statusVersion)
         recordingsContainer = findViewById(R.id.recordingsContainer)
         currentVersion = findViewById(R.id.currentVersion)
         updateStatus = findViewById(R.id.updateStatus)
@@ -174,6 +179,7 @@ class MainActivity : AppCompatActivity() {
         checkAutoStart.setOnCheckedChangeListener { _, c -> settings.save(settings.load().copy(autoStart = c)) }
         checkShizuku.setOnCheckedChangeListener { _, c -> settings.setShizukuEnabled(c) }
         btnToggleService.setOnClickListener { onToggleClicked() }
+        btnTestRecording.setOnClickListener { if (testRecorder == null) startTestRecording() else stopTestRecording() }
         btnCheckUpdates.setOnClickListener { checkForUpdates() }
         btnOpenRelease.setOnClickListener { openReleasePage() }
 
@@ -195,7 +201,7 @@ class MainActivity : AppCompatActivity() {
 
         updateExecutor.execute {
             val fetcher = UpdateChecker.Fetcher { url: String -> httpGet(url) }
-            val checker = UpdateChecker(BuildConfig.VERSION_CODE, fetcher)
+            val checker = UpdateChecker(BuildConfig.VERSION_NAME, fetcher)
             val result = checker.check()
             runOnUiThread {
                 btnCheckUpdates.isEnabled = true
@@ -209,6 +215,11 @@ class MainActivity : AppCompatActivity() {
                         updateStatus.text = getString(R.string.updates_available, result.latestVersion)
                         latestReleaseUrl = result.releaseUrl
                         btnOpenRelease.visibility = View.VISIBLE
+                    }
+                    is UpdateChecker.Result.NoReleases -> {
+                        updateStatus.text = getString(R.string.updates_no_releases)
+                        latestReleaseUrl = null
+                        btnOpenRelease.visibility = View.GONE
                     }
                     is UpdateChecker.Result.Failure -> {
                         updateStatus.text = getString(R.string.updates_error)
@@ -239,6 +250,55 @@ class MainActivity : AppCompatActivity() {
         } finally {
             connection.disconnect()
         }
+    }
+
+    private var testRecorder: com.callrecorder.recorder.MediaRecorderAudioRecorder? = null
+    private var testFile: File? = null
+    private val testHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * Records five seconds through the same recorder the service uses, so capture
+     * can be verified without waiting for a phone call.
+     */
+    private fun startTestRecording() {
+        btnTestRecording.isEnabled = false
+        try {
+            val dir = File(filesDir, "recordings").apply { mkdirs() }
+            val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HHmmss", java.util.Locale.US)
+                .format(java.util.Date())
+            val file = File(dir, "test_" + stamp + ".wav")
+            val recorder = com.callrecorder.recorder.MediaRecorderAudioRecorder()
+            recorder.start(
+                settings.load().copy(format = com.callrecorder.model.RecordingFormat.WAV_PCM),
+                file,
+            )
+            testRecorder = recorder
+            testFile = file
+            btnTestRecording.setText(R.string.test_recording_stop)
+            toast(getString(R.string.notification_recording))
+            testHandler.postDelayed({ stopTestRecording() }, 5000)
+        } catch (e: Exception) {
+            toast(getString(R.string.test_recording_failed) + ": " + (e.message ?: ""))
+            testRecorder = null
+        } finally {
+            btnTestRecording.isEnabled = true
+        }
+    }
+
+    private fun stopTestRecording() {
+        val recorder = testRecorder ?: return
+        testRecorder = null
+        testHandler.removeCallbacksAndMessages(null)
+        try {
+            recorder.stop()
+        } catch (_: Exception) {
+        }
+        btnTestRecording.setText(R.string.test_recording)
+        btnTestRecording.isEnabled = true
+        val name = testFile?.name
+        testFile = null
+        toast(getString(R.string.test_recording_saved) + " " + (name ?: ""))
+        refreshUi()
     }
 
     private fun onToggleClicked() {
@@ -378,6 +438,7 @@ class MainActivity : AppCompatActivity() {
         statusSummary.text = getString(R.string.format_title) + ": " + config.format.label + "  \u00b7  " + getString(R.string.quality_title) + ": " + config.quality.label
         val folderLabel = config.storageFolderUri?.let { friendlyFolder(it) } ?: getString(R.string.storage_app_private)
         statusFolder.text = getString(R.string.storage_title) + ": " + folderLabel
+        statusVersion.text = "v" + BuildConfig.VERSION_NAME + " (" + BuildConfig.VERSION_CODE + ")"
         storagePath.text = folderLabel
         btnToggleService.setText(if (settings.isRecorderEnabled()) R.string.btn_stop else R.string.btn_start)
         checkCellular.isChecked = config.recordCellularCalls
@@ -439,6 +500,75 @@ class MainActivity : AppCompatActivity() {
             row.addView(play)
             row.addView(share)
             recordingsContainer.addView(row)
+        }
+        appendFolderRecordings(config)
+    }
+
+    /** Recordings that already sit in the folder the user picked. */
+    private fun appendFolderRecordings(config: RecorderConfig) {
+        val treeUri = config.storageFolderUri ?: return
+        val docs = try {
+            com.callrecorder.storage.SafStore.listAudio(this, Uri.parse(treeUri))
+        } catch (_: Exception) {
+            emptyList()
+        }
+        if (docs.isEmpty()) return
+
+        val header = TextView(this).apply {
+            text = friendlyFolder(treeUri)
+            textSize = 13f
+            setPadding(0, 16, 0, 0)
+        }
+        recordingsContainer.addView(header)
+
+        docs.take(20).forEach { doc ->
+            val name = doc.name ?: return@forEach
+            val uri = doc.uri
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, 8, 0, 8)
+            }
+            row.addView(TextView(this).apply {
+                text = name
+                textSize = 14f
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            row.addView(Button(this).apply {
+                text = "Play"
+                setOnClickListener { playUri(uri) }
+            })
+            row.addView(Button(this).apply {
+                text = "Share"
+                setOnClickListener { shareUri(uri, name) }
+            })
+            recordingsContainer.addView(row)
+        }
+        recordingsEmpty.visibility = View.GONE
+    }
+
+    private fun playUri(uri: Uri) {
+        try {
+            player?.release()
+            player = MediaPlayer().apply {
+                setDataSource(this@MainActivity, uri)
+                prepare()
+                start()
+            }
+        } catch (_: Exception) {
+            toast(getString(R.string.playback_error))
+        }
+    }
+
+    private fun shareUri(uri: Uri, name: String) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "audio/*"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            startActivity(Intent.createChooser(send, name))
+        } catch (_: Exception) {
+            toast(getString(R.string.sharing_no_app))
         }
     }
 

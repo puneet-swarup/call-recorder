@@ -8,10 +8,17 @@ package com.callrecorder.update
  * plain JVM code and runs unchanged in unit tests.
  */
 class UpdateChecker(
-    private val currentVersionCode: Int,
+    currentVersionName: String,
     private val fetcher: Fetcher,
     private val releasesUrl: String = DEFAULT_RELEASES_URL,
 ) {
+
+    /**
+     * Compare like with like. Release tags are semver ("v1.3.0"); the build's
+     * versionCode is an unrelated monotonic counter, so comparing the two always
+     * said "update available".
+     */
+    private val currentVersionCode: Int = parseVersionCode(currentVersionName)
 
     fun interface Fetcher {
         fun get(url: String): String
@@ -26,13 +33,16 @@ class UpdateChecker(
             val releaseUrl: String,
         ) : Result()
         data class Failure(val reason: String) : Result()
+        object NoReleases : Result()
     }
 
     fun check(): Result {
         val body = try {
             fetcher.get(releasesUrl)
         } catch (e: Exception) {
-            return Result.Failure("Network error: " + (e.message ?: e.javaClass.simpleName))
+            val message = e.message ?: e.javaClass.simpleName
+            if (message.contains("404")) return Result.NoReleases
+            return Result.Failure("Network error: " + message)
         }
 
         if (body.isBlank()) return Result.Failure("Empty response from GitHub")

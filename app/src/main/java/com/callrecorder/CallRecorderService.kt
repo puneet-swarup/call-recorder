@@ -19,6 +19,8 @@ import com.callrecorder.recorder.PreferredAudioRecorder
 import com.callrecorder.recorder.RecordingRepository
 import com.callrecorder.service.RecordingCoordinator
 import com.callrecorder.settings.SettingsRepository
+import com.callrecorder.storage.SafStore
+import android.net.Uri
 import org.json.JSONObject
 import java.io.File
 
@@ -209,7 +211,8 @@ class CallRecorderService : Service() {
         }
         if (path != null) {
             lastCompletedPath = path
-            writeDiagnostics(path)
+            val copied = copyToChosenFolder(path)
+            writeDiagnostics(path, copied)
             maybeAutoShare(path)
         }
     }
@@ -239,7 +242,24 @@ class CallRecorderService : Service() {
      * Writes a .json sidecar next to the recording. This is what tells us whether
      * the platform delivered audio (peak > 0) or silence (peak == 0) on a device.
      */
-    private fun writeDiagnostics(path: String) {
+    /**
+     * The folder picker gives us a SAF tree URI, which MediaRecorder cannot write to
+     * directly. Record locally, then copy the finished file into the chosen folder so
+     * it shows up in the user's Files app.
+     */
+    private fun copyToChosenFolder(path: String): String? {
+        val treeUri = settings.load().storageFolderUri ?: return null
+        return try {
+            val uri = SafStore.copyIntoFolder(this, Uri.parse(treeUri), File(path))
+            if (uri == null) Log.w(TAG, "could not copy recording into the chosen folder")
+            uri?.toString()
+        } catch (e: Exception) {
+            Log.w(TAG, "folder copy failed", e)
+            null
+        }
+    }
+
+    private fun writeDiagnostics(path: String, folderUri: String? = null) {
         try {
             val mean = if (amplitudeSamples == 0L) 0 else (amplitudeSum / amplitudeSamples)
             val json = JSONObject().apply {
@@ -253,6 +273,7 @@ class CallRecorderService : Service() {
                 put("device", Build.MANUFACTURER + " " + Build.MODEL)
                 put("audioMode", audioManagerMode())
                 put("silent", peakAmplitude == 0)
+                put("folderUri", folderUri ?: "none")
             }
             File(path + ".json").writeText(json.toString(2))
         } catch (e: Exception) {
