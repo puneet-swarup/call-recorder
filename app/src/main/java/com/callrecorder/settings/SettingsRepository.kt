@@ -48,6 +48,17 @@ class SettingsRepository(context: Context) {
 
     fun isRecorderEnabled(): Boolean = prefs.getBoolean(KEY_RECORDER_ENABLED, false)
 
+    /**
+     * Prefer the Shizuku capture path (both call legs, needs the Shizuku app and a
+     * one-time permission grant). Falls back to the microphone automatically when
+     * Shizuku is unavailable, so this can stay on by default.
+     */
+    fun isShizukuEnabled(): Boolean = prefs.getBoolean(KEY_USE_SHIZUKU, true)
+
+    fun setShizukuEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_USE_SHIZUKU, enabled).apply()
+    }
+
     companion object {
         const val PREFS_NAME = "callrecorder_settings"
         private const val KEY_FORMAT = "format"
@@ -61,5 +72,6 @@ class SettingsRepository(context: Context) {
         private const val KEY_SHARE_RECIPIENT = "share_recipient"
         private const val KEY_AUTO_SHARE = "auto_share"
         private const val KEY_MINIMISE = "minimise"
+        private const val KEY_USE_SHIZUKU = "use_shizuku"
     }
 }

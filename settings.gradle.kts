@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "call-recorder"
 
 include(":app")
+include(":shizuku-recorder")

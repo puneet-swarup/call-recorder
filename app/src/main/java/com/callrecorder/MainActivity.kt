@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var checkCellular: CheckBox
     private lateinit var checkVoip: CheckBox
     private lateinit var checkAutoStart: CheckBox
+    private lateinit var checkShizuku: CheckBox
     private lateinit var recordingsEmpty: TextView
     private lateinit var recordingsContainer: LinearLayout
     private lateinit var shareRecipient: android.widget.EditText
@@ -116,6 +117,7 @@ class MainActivity : AppCompatActivity() {
         checkCellular = findViewById(R.id.checkCellular)
         checkVoip = findViewById(R.id.checkVoip)
         checkAutoStart = findViewById(R.id.checkAutoStart)
+        checkShizuku = findViewById(R.id.checkShizuku)
         recordingsEmpty = findViewById(R.id.recordingsEmpty)
         recordingsContainer = findViewById(R.id.recordingsContainer)
         currentVersion = findViewById(R.id.currentVersion)
@@ -170,6 +172,7 @@ class MainActivity : AppCompatActivity() {
         checkCellular.setOnCheckedChangeListener { _, c -> settings.save(settings.load().copy(recordCellularCalls = c)) }
         checkVoip.setOnCheckedChangeListener { _, c -> settings.save(settings.load().copy(recordVoipCalls = c)) }
         checkAutoStart.setOnCheckedChangeListener { _, c -> settings.save(settings.load().copy(autoStart = c)) }
+        checkShizuku.setOnCheckedChangeListener { _, c -> settings.setShizukuEnabled(c) }
         btnToggleService.setOnClickListener { onToggleClicked() }
         btnCheckUpdates.setOnClickListener { checkForUpdates() }
         btnOpenRelease.setOnClickListener { openReleasePage() }
@@ -246,6 +249,7 @@ class MainActivity : AppCompatActivity() {
             // Started from a visible activity on purpose: Android 14+ refuses to
             // create a microphone foreground service from the background.
             CallRecorderService.arm(this)
+            requestShizukuPermissionIfNeeded()
             if (!isAccessibilityServiceEnabled()) {
                 showAccessibilityPrompt()
             }
@@ -254,6 +258,22 @@ class MainActivity : AppCompatActivity() {
         }
         refreshUi()
         btnToggleService.post { btnToggleService.isEnabled = true }
+    }
+
+    /**
+     * Shizuku shows its own consent dialog. Only ask from a visible activity; if
+     * Shizuku is not installed or not running this is a no-op and the recorder
+     * stays on the microphone path.
+     */
+    private fun requestShizukuPermissionIfNeeded() {
+        try {
+            val shizuku = com.callrecorder.shizuku.ShizukuRecorder(this)
+            if (shizuku.isSupported && !shizuku.hasPermission) {
+                shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
+            }
+        } catch (_: Throwable) {
+            // Shizuku absent or its binder died; the microphone path still works.
+        }
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
@@ -363,6 +383,7 @@ class MainActivity : AppCompatActivity() {
         checkCellular.isChecked = config.recordCellularCalls
         checkVoip.isChecked = config.recordVoipCalls
         checkAutoStart.isChecked = config.autoStart
+        checkShizuku.isChecked = settings.isShizukuEnabled()
         shareRecipient.setText(config.shareRecipient ?: "")
         checkAutoShare.isChecked = config.autoShareOnComplete
         checkMinimise.isChecked = config.minimiseMode
@@ -479,5 +500,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val PERMISSION_REQUEST_CODE = 1001
+        private const val SHIZUKU_REQUEST_CODE = 2001
     }
 }

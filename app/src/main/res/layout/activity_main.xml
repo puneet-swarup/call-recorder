@@ -227,6 +227,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/behaviour_auto_start" />
+
+            <CheckBox
+                android:id="@+id/checkShizuku"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/behaviour_use_shizuku" />
         </LinearLayout>
 
         <!-- RECORDINGS CARD -->

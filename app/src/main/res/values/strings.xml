@@ -57,4 +57,5 @@
     <string name="accessibility_message">Android silences a normal app\'s microphone during a call. Turning on the Call Recorder accessibility service is what keeps the audio flowing. It reads nothing on screen. Turn it on before you make a call - Android 16 blocks enabling it mid-call.</string>
     <string name="accessibility_open_settings">Open accessibility settings</string>
     <string name="accessibility_later">Later</string>
+    <string name="behaviour_use_shizuku">Record both sides through Shizuku (needs the Shizuku app; falls back to microphone)</string>
 </resources>

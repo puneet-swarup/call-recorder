@@ -1,0 +1,3 @@
+-keep class com.callrecorder.shizuku.RecorderUserService { *; }
+-keep class com.callrecorder.shizuku.IShizukuRecorder { *; }
+-keep class com.callrecorder.shizuku.IShizukuRecorder$Stub { *; }
