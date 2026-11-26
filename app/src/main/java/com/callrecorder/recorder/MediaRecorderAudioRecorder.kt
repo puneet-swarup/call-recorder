@@ -1,30 +1,34 @@
 package com.callrecorder.recorder
 
 import android.media.MediaRecorder
-import android.os.Build
 import android.util.Log
 import com.callrecorder.model.RecorderConfig
 import com.callrecorder.model.RecordingFormat
 import java.io.File
 
 /**
- * MediaRecorder-backed audio recorder.
+ * MediaRecorder-backed audio recorder, with a WAV path handled by AudioRecord.
  *
- * The audio source is chosen at runtime by trial: VOICE_CALL is the only source
- * that reliably captures both parties, but stock Android 10+ reserves it for
- * system apps. Many OEM ROMs (MIUI, some Samsung/Realme builds) do not enforce
- * that restriction, so we try it first and step down on failure.
- *
- * Order: VOICE_CALL -> VOICE_COMMUNICATION -> MIC
+ * The audio source is chosen at runtime by trial, best first (see [AudioSources]).
+ * On stock Android 10+ only MIC-family sources are actually available to a normal
+ * app, so expect the fallback to be the one that sticks.
  */
 class MediaRecorderAudioRecorder : AudioRecorder {
     private var mediaRecorder: MediaRecorder? = null
+    private val wavRecorder = WavPcmRecorder()
+    private var wavOutput: File? = null
+
     override var isRecording: Boolean = false
         private set
 
-    /** Name of the source that actually started, e.g. "VOICE_CALL". */
+    /** Name of the source that actually started, e.g. "MIC". */
     @Volatile
     var lastUsedSourceName: String? = null
+        private set
+
+    /** Last error text, for the diagnostic screen. */
+    @Volatile
+    var lastError: String? = null
         private set
 
     override fun start(config: RecorderConfig, outputFile: File) {
@@ -32,9 +36,18 @@ class MediaRecorderAudioRecorder : AudioRecorder {
         outputFile.parentFile?.mkdirs()
 
         lastUsedSourceName = null
-        var lastError: Exception? = null
+        lastError = null
 
-        for (candidate in candidates()) {
+        if (config.format == RecordingFormat.WAV_PCM) {
+            wavOutput = outputFile
+            wavRecorder.start(WavPcmRecorder.SAMPLE_RATE, outputFile)
+            isRecording = true
+            lastUsedSourceName = wavRecorder.sourceName
+            return
+        }
+
+        var failure: Exception? = null
+        for (candidate in AudioSources.candidates()) {
             val recorder = MediaRecorder()
             try {
                 recorder.setAudioSource(candidate.source)
@@ -49,27 +62,31 @@ class MediaRecorderAudioRecorder : AudioRecorder {
                 Log.i(TAG, "recording with audio source " + candidate.name)
                 return
             } catch (e: Exception) {
-                lastError = e
+                failure = e
                 Log.w(TAG, "audio source " + candidate.name + " rejected: " + e.message)
                 try {
                     recorder.release()
                 } catch (_: Exception) {
                     // best effort
                 }
-                // A failed attempt may leave a zero-byte file; the next attempt
-                // overwrites it because setOutputFile truncates.
             }
         }
 
         isRecording = false
-        throw IllegalStateException(
-            "No usable audio source on this device (last error: " +
-                (lastError?.message ?: "unknown") + ")",
-            lastError,
-        )
+        val message = "No usable audio source on this device (last error: " +
+            (failure?.message ?: "unknown") + ")"
+        lastError = message
+        throw IllegalStateException(message, failure)
     }
 
     override fun stop() {
+        if (wavRecorder.isRecording) {
+            val path = wavOutput
+            if (path != null) wavRecorder.stop(path)
+            wavOutput = null
+            isRecording = false
+            return
+        }
         val recorder = mediaRecorder ?: return
         try {
             recorder.stop()
@@ -82,21 +99,14 @@ class MediaRecorderAudioRecorder : AudioRecorder {
         }
     }
 
-    private data class Source(val name: String, val source: Int)
-
-    private fun candidates(): List<Source> {
-        val list = mutableListOf<Source>()
-        // VOICE_CALL captures both parties but is system-only on stock Android 10+.
-        // Still worth trying: several OEM ROMs permit it, which is why some
-        // third-party recorders appear to capture both sides on those devices.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            list.add(Source("VOICE_CALL", MediaRecorder.AudioSource.VOICE_CALL))
-        } else {
-            list.add(Source("VOICE_CALL", MediaRecorder.AudioSource.VOICE_CALL))
+    /** Peak amplitude since the last call, 0..32767. Used for silence detection. */
+    fun maxAmplitude(): Int = when {
+        wavRecorder.isRecording -> wavRecorder.maxAmplitude()
+        else -> try {
+            mediaRecorder?.maxAmplitude ?: 0
+        } catch (_: Exception) {
+            0
         }
-        list.add(Source("VOICE_COMMUNICATION", MediaRecorder.AudioSource.VOICE_COMMUNICATION))
-        list.add(Source("MIC", MediaRecorder.AudioSource.MIC))
-        return list
     }
 
     private fun applyFormat(recorder: MediaRecorder, config: RecorderConfig) {
@@ -122,7 +132,7 @@ class MediaRecorderAudioRecorder : AudioRecorder {
             RecordingFormat.MP3 -> MediaRecorder.OutputFormat.MPEG_4
             RecordingFormat.AMR_NB -> MediaRecorder.OutputFormat.AMR_NB
             RecordingFormat.AMR_WB -> MediaRecorder.OutputFormat.AMR_WB
-            RecordingFormat.WAV_PCM -> MediaRecorder.OutputFormat.THREE_GPP
+            RecordingFormat.WAV_PCM -> MediaRecorder.OutputFormat.MPEG_4
         }
     }
 }

@@ -243,12 +243,41 @@ class MainActivity : AppCompatActivity() {
         settings.setRecorderEnabled(nowEnabled)
         btnToggleService.isEnabled = false
         if (nowEnabled) {
-            ContextCompat.startForegroundService(this, Intent(this, CallRecorderService::class.java))
+            // Started from a visible activity on purpose: Android 14+ refuses to
+            // create a microphone foreground service from the background.
+            CallRecorderService.arm(this)
+            if (!isAccessibilityServiceEnabled()) {
+                showAccessibilityPrompt()
+            }
         } else {
             stopService(Intent(this, CallRecorderService::class.java))
         }
         refreshUi()
         btnToggleService.post { btnToggleService.isEnabled = true }
+    }
+
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val expected = packageName + "/" + com.callrecorder.call.CallAudioAccessibilityService::class.java.name
+        val enabled = android.provider.Settings.Secure.getString(
+            contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ) ?: return false
+        return enabled.split(':').any { it.equals(expected, ignoreCase = true) }
+    }
+
+    private fun showAccessibilityPrompt() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.accessibility_title)
+            .setMessage(R.string.accessibility_message)
+            .setPositiveButton(R.string.accessibility_open_settings) { _, _ ->
+                try {
+                    startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                } catch (_: Exception) {
+                    toast(getString(R.string.accessibility_open_settings))
+                }
+            }
+            .setNegativeButton(R.string.accessibility_later, null)
+            .show()
     }
 
     private fun saveRecipient() {

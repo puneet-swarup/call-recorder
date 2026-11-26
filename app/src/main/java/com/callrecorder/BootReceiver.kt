@@ -9,9 +9,12 @@ import androidx.core.content.ContextCompat
 import com.callrecorder.settings.SettingsRepository
 
 /**
- * Restarts the recorder after a reboot or an app update, but only when the user
- * has actually enabled recording. The persisted recorderEnabled flag is the
- * single source of truth; the old autoStart preference was unrelated to it.
+ * Restarts the recorder after a reboot or an app update.
+ *
+ * Android 14+ refuses to launch a `microphone` foreground service from a
+ * BOOT_COMPLETED receiver. We still try (it works up to Android 13), and fall
+ * back to a notification whose action arms the service — that path is an
+ * allowed exemption to the while-in-use restriction.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -30,14 +33,13 @@ class BootReceiver : BroadcastReceiver() {
         }
 
         try {
-            val serviceIntent = Intent(context, CallRecorderService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ContextCompat.startForegroundService(context, serviceIntent)
-            } else {
-                context.startService(serviceIntent)
+            val serviceIntent = Intent(context, CallRecorderService::class.java).apply {
+                this.action = CallRecorderService.ACTION_ARM
             }
+            ContextCompat.startForegroundService(context, serviceIntent)
         } catch (e: Exception) {
-            Log.w(TAG, "failed to restart recorder after " + action, e)
+            Log.w(TAG, "cannot start recorder from " + action + ", asking the user", e)
+            CallRecorderService.postArmNotification(context, "after restart")
         }
     }
 

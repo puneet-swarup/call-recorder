@@ -51,4 +51,10 @@
     <string name="btn_start">Enable call recording</string>
     <string name="btn_stop">Disable call recording</string>
     <string name="playback_error">Could not play this recording</string>
+    <string name="accessibility_label">Call Recorder audio access</string>
+    <string name="accessibility_description">Keeps the microphone stream available while a call is in progress. Android silences ordinary apps during calls unless an accessibility service is enabled. This service reads no screen content.</string>
+    <string name="accessibility_title">Allow recording during calls</string>
+    <string name="accessibility_message">Android silences a normal app\'s microphone during a call. Turning on the Call Recorder accessibility service is what keeps the audio flowing. It reads nothing on screen. Turn it on before you make a call - Android 16 blocks enabling it mid-call.</string>
+    <string name="accessibility_open_settings">Open accessibility settings</string>
+    <string name="accessibility_later">Later</string>
 </resources>
