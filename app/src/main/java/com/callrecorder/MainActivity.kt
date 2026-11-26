@@ -121,6 +121,7 @@ class MainActivity : AppCompatActivity() {
         checkVoip = findViewById(R.id.checkVoip)
         checkAutoStart = findViewById(R.id.checkAutoStart)
         checkShizuku = findViewById(R.id.checkShizuku)
+        checkShizuku.visibility = View.GONE
         recordingsEmpty = findViewById(R.id.recordingsEmpty)
         btnTestRecording = findViewById(R.id.btnTestRecording)
         statusVersion = findViewById(R.id.statusVersion)
@@ -309,7 +310,6 @@ class MainActivity : AppCompatActivity() {
             // Started from a visible activity on purpose: Android 14+ refuses to
             // create a microphone foreground service from the background.
             CallRecorderService.arm(this)
-            requestShizukuPermissionIfNeeded()
             if (!isAccessibilityServiceEnabled()) {
                 showAccessibilityPrompt()
             }
@@ -318,22 +318,6 @@ class MainActivity : AppCompatActivity() {
         }
         refreshUi()
         btnToggleService.post { btnToggleService.isEnabled = true }
-    }
-
-    /**
-     * Shizuku shows its own consent dialog. Only ask from a visible activity; if
-     * Shizuku is not installed or not running this is a no-op and the recorder
-     * stays on the microphone path.
-     */
-    private fun requestShizukuPermissionIfNeeded() {
-        try {
-            val shizuku = com.callrecorder.shizuku.ShizukuRecorder(this)
-            if (shizuku.isSupported && !shizuku.hasPermission) {
-                shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
-            }
-        } catch (_: Throwable) {
-            // Shizuku absent or its binder died; the microphone path still works.
-        }
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {

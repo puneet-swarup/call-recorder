@@ -15,7 +15,7 @@ import android.os.Looper
 import android.telephony.TelephonyManager
 import android.util.Log
 import com.callrecorder.model.CallType
-import com.callrecorder.recorder.PreferredAudioRecorder
+import com.callrecorder.recorder.MediaRecorderAudioRecorder
 import com.callrecorder.recorder.RecordingRepository
 import com.callrecorder.service.RecordingCoordinator
 import com.callrecorder.settings.SettingsRepository
@@ -39,7 +39,7 @@ class CallRecorderService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var settings: SettingsRepository
     private lateinit var coordinator: RecordingCoordinator
-    private lateinit var recorder: PreferredAudioRecorder
+    private val recorder = MediaRecorderAudioRecorder()
 
     private var currentPhoneNumber: String? = null
     private var currentCallType: CallType = CallType.UNKNOWN
@@ -57,7 +57,6 @@ class CallRecorderService : Service() {
     override fun onCreate() {
         super.onCreate()
         settings = SettingsRepository(this)
-        recorder = PreferredAudioRecorder(this) { settings.isShizukuEnabled() }
         coordinator = RecordingCoordinator(recorder, RecordingRepository(recordingsDir()))
         createNotificationChannel()
     }
@@ -81,7 +80,6 @@ class CallRecorderService : Service() {
     override fun onDestroy() {
         pendingStart?.let { handler.removeCallbacks(it) }
         stopMeter()
-        recorder.release()
         if (coordinator.isRecording()) coordinator.stopRecording()
         armed = false
         isRunning = false
@@ -106,7 +104,6 @@ class CallRecorderService : Service() {
             armed = true
             isRunning = true
             settings.setRecorderEnabled(true)
-            recorder.prepare()
             Log.i(TAG, "armed")
         } catch (t: Throwable) {
             // SecurityException (RECORD_AUDIO missing) or
@@ -179,9 +176,8 @@ class CallRecorderService : Service() {
             pendingStart = null
             if (coordinator.isRecording()) return@Runnable
             // The Shizuku path always produces WAV; name the file to match.
-            val effective = config.copy(format = recorder.forcedFormat(config))
             val result = coordinator.startRecording(
-                effective,
+                config,
                 currentCallType,
                 currentPhoneNumber ?: "UNKNOWN",
             )
