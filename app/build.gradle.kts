@@ -50,6 +50,13 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
+            // Sign debug builds with the same key as releases so an in-app update
+            // can install over an existing install. Minification stays off so R8
+            // cannot break anything we have not tested.
+            val stable = signingConfigs.getByName("release")
+            if (stable.storeFile != null) {
+                signingConfig = stable
+            }
         }
         release {
             isMinifyEnabled = true
