@@ -164,15 +164,21 @@ class MainActivity : AppCompatActivity() {
         invalidateOptionsMenu()
         buildList(collectLocal())
         ioExecutor.execute {
-            val external = try {
-                collectExternal()
+            val found = mutableListOf<Item>()
+            try {
+                found.addAll(collectFromChosenFolder())
             } catch (_: Throwable) {
-                emptyList()
             }
-            if (external.isEmpty()) return@execute
+            try {
+                found.addAll(collectExternal())
+            } catch (_: Throwable) {
+            }
+            val seen = HashSet<String>()
+            val unique = found.filter { seen.add(it.key) }
+            if (unique.isEmpty()) return@execute
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
-                buildList(collectLocal() + external)
+                buildList(collectLocal() + unique)
             }
         }
     }
@@ -256,6 +262,29 @@ class MainActivity : AppCompatActivity() {
      * previous handset. MediaStore indexes them, so no folder permission is needed
      * beyond audio read access.
      */
+    /** Audio already sitting in the folder the user picked in Settings. */
+    private fun collectFromChosenFolder(): List<Item> {
+        val treeUri = settings.load().storageFolderUri ?: return emptyList()
+        val uri = Uri.parse(treeUri)
+        val permitted = contentResolver.persistedUriPermissions.any {
+            it.uri == uri && it.isReadPermission
+        }
+        if (!permitted) return emptyList()
+        return com.callrecorder.storage.SafStore.listAudio(this, uri)
+            .take(100)
+            .mapNotNull { doc ->
+                val name = doc.name ?: return@mapNotNull null
+                Item(
+                    key = doc.uri.toString(),
+                    name = name,
+                    date = describeDate(doc.lastModified()),
+                    size = describeSize(doc.length()),
+                    file = null,
+                    uri = doc.uri,
+                )
+            }
+    }
+
     private fun collectExternal(): List<Item> {
         if (!hasExternalAudioPermission()) return emptyList()
         val results = mutableListOf<Item>()
@@ -266,9 +295,7 @@ class MainActivity : AppCompatActivity() {
             MediaStore.Audio.Media.SIZE,
             MediaStore.Audio.Media.DATE_MODIFIED,
         )
-        val selection = "lower(${MediaStore.Audio.Media.DISPLAY_NAME}) LIKE ?"
-        val args = arrayOf("%call%")
-        contentResolver.query(collection, projection, selection, args, "${MediaStore.Audio.Media.DATE_MODIFIED} DESC")
+        contentResolver.query(collection, projection, null, null, "${MediaStore.Audio.Media.DATE_MODIFIED} DESC")
             ?.use { cursor ->
                 val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
@@ -278,6 +305,7 @@ class MainActivity : AppCompatActivity() {
                 while (cursor.moveToNext() && count < 100) {
                     val id = cursor.getLong(idCol)
                     val name = cursor.getString(nameCol) ?: continue
+                    if (!looksLikeRecording(name)) continue
                     val size = cursor.getLong(sizeCol)
                     val modified = cursor.getLong(dateCol) * 1000
                     val uri = android.content.ContentUris.withAppendedId(collection, id)
@@ -295,6 +323,23 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         return results
+    }
+
+    /**
+     * The old filter only matched names containing "call", which missed the
+     * previous app's files. Accept anything that looks like a recording.
+     */
+    private fun looksLikeRecording(name: String): Boolean {
+        val lower = name.lowercase()
+        if (lower.contains("callrec") || lower.contains("call record") ||
+            lower.contains("callrecord") || lower.contains("recorder")
+        ) {
+            return true
+        }
+        if (lower.startsWith("call") || lower.contains("_in_") || lower.contains("_out_")) {
+            return true
+        }
+        return Regex("\\d{4}-\\d{2}-\\d{2}[_ ]\\d{2}[-:]\\d{2}").containsMatchIn(name)
     }
 
     private fun describeDate(modified: Long): String =
@@ -392,15 +437,27 @@ class MainActivity : AppCompatActivity() {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 when (result) {
                     is UpdateChecker.Result.UpdateAvailable -> offerUpdate(result)
-                    is UpdateChecker.Result.UpToDate ->
-                        toast(getString(R.string.updates_up_to_date))
-                    is UpdateChecker.Result.NoReleases ->
-                        toast(getString(R.string.updates_no_releases))
-                    is UpdateChecker.Result.Failure ->
-                        toast(getString(R.string.updates_error) + " " + result.reason)
+                    is UpdateChecker.Result.UpToDate -> showStatus(
+                        getString(R.string.updates_up_to_date) + "\n\n" +
+                            "Installed: " + BuildConfig.VERSION_NAME +
+                            " (" + BuildConfig.VERSION_CODE + ")\n" +
+                            "Latest release: " + result.latestVersion,
+                    )
+                    is UpdateChecker.Result.NoReleases -> showStatus(getString(R.string.updates_no_releases))
+                    is UpdateChecker.Result.Failure -> showStatus(
+                        getString(R.string.updates_error) + "\n\n" + result.reason,
+                    )
                 }
             }
         }
+    }
+
+    private fun showStatus(message: String) {
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.notification_title)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun offerUpdate(update: UpdateChecker.Result.UpdateAvailable) {
