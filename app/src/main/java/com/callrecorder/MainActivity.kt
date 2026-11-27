@@ -48,6 +48,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var checkShizuku: CheckBox
     private lateinit var recordingsEmpty: TextView
     private lateinit var btnTestRecording: Button
+    private lateinit var btnSettings: Button
+    private lateinit var settingsContainer: LinearLayout
     private lateinit var statusVersion: TextView
     private lateinit var recordingsContainer: LinearLayout
     private lateinit var shareRecipient: android.widget.EditText
@@ -125,6 +127,8 @@ class MainActivity : AppCompatActivity() {
         checkShizuku.visibility = View.GONE
         recordingsEmpty = findViewById(R.id.recordingsEmpty)
         btnTestRecording = findViewById(R.id.btnTestRecording)
+        btnSettings = findViewById(R.id.btnSettings)
+        settingsContainer = findViewById(R.id.settingsContainer)
         statusVersion = findViewById(R.id.statusVersion)
         recordingsContainer = findViewById(R.id.recordingsContainer)
         currentVersion = findViewById(R.id.currentVersion)
@@ -181,6 +185,7 @@ class MainActivity : AppCompatActivity() {
         checkAutoStart.setOnCheckedChangeListener { _, c -> settings.save(settings.load().copy(autoStart = c)) }
         checkShizuku.setOnCheckedChangeListener { _, c -> settings.setShizukuEnabled(c) }
         btnToggleService.setOnClickListener { onToggleClicked() }
+        btnSettings.setOnClickListener { toggleSettings() }
         btnTestRecording.setOnClickListener { if (testRecorder == null) startTestRecording() else stopTestRecording() }
         btnCheckUpdates.setOnClickListener { checkForUpdates() }
         btnOpenRelease.setOnClickListener { openReleasePage() }
@@ -301,6 +306,16 @@ class MainActivity : AppCompatActivity() {
         testFile = null
         toast(getString(R.string.test_recording_saved) + " " + (name ?: ""))
         refreshUi()
+    }
+
+    /** Settings live behind the menu button, the way the original app did it. */
+    private fun toggleSettings() {
+        val show = settingsContainer.visibility != View.VISIBLE
+        settingsContainer.visibility = if (show) View.VISIBLE else View.GONE
+        btnSettings.setText(if (show) R.string.settings_button_close else R.string.settings_button)
+        if (!show) {
+            window.decorView.post { refreshUi() }
+        }
     }
 
     private fun onToggleClicked() {
