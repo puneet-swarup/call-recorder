@@ -33,10 +33,9 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var settings: SettingsRepository
 
-    private lateinit var statusValue: TextView
-    private lateinit var btnToggleService: Button
-    private lateinit var btnTestRecording: Button
-    private lateinit var btnSettings: Button
+    private lateinit var toolbar: androidx.appcompat.widget.Toolbar
+    private lateinit var storageText: TextView
+    private lateinit var fabRecord: com.google.android.material.floatingactionbutton.FloatingActionButton
     private lateinit var recordingsContainer: LinearLayout
     private lateinit var recordingsEmpty: TextView
 
@@ -51,7 +50,8 @@ class MainActivity : AppCompatActivity() {
     private data class Item(
         val key: String,
         val name: String,
-        val detail: String,
+        val date: String,
+        val size: String,
         val file: File?,
         val uri: Uri?,
     )
@@ -79,45 +79,44 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindViews() {
-        statusValue = findViewById(R.id.statusValue)
-        btnToggleService = findViewById(R.id.btnToggleService)
-        btnTestRecording = findViewById(R.id.btnTestRecording)
-        btnSettings = findViewById(R.id.btnSettings)
+        toolbar = findViewById(R.id.toolbar)
+        storageText = findViewById(R.id.storageText)
+        fabRecord = findViewById(R.id.fabRecord)
         recordingsContainer = findViewById(R.id.recordingsContainer)
         recordingsEmpty = findViewById(R.id.recordingsEmpty)
+        setSupportActionBar(toolbar)
     }
 
     private fun wireListeners() {
-        btnToggleService.setOnClickListener { onToggleClicked() }
-        btnTestRecording.setOnClickListener {
-            if (testRecorder == null) startTestRecording() else stopTestRecording()
-        }
-        btnSettings.setOnClickListener { showMenu() }
+        fabRecord.setOnClickListener { onToggleClicked() }
     }
 
-    private fun showMenu() {
-        val menu = PopupMenu(this, btnSettings)
-        menu.menu.add(0, 1, 0, getString(R.string.menu_settings))
-        menu.menu.add(0, 2, 1, getString(R.string.menu_share_all))
-        menu.menu.add(0, 3, 2, getString(R.string.menu_check_updates))
-        menu.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                1 -> {
-                    startActivity(Intent(this, SettingsActivity::class.java))
-                    true
-                }
-                2 -> {
-                    shareAll()
-                    true
-                }
-                3 -> {
-                    checkForUpdates()
-                    true
-                }
-                else -> false
-            }
+    override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
+        menu.add(0, MENU_TOGGLE, 0, R.string.btn_start)
+        menu.add(0, MENU_TEST, 1, R.string.menu_test)
+        menu.add(0, MENU_SHARE, 2, R.string.menu_share_all)
+        menu.add(0, MENU_UPDATE, 3, R.string.menu_check_updates)
+        menu.add(0, MENU_SETTINGS, 4, R.string.menu_settings)
+        return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: android.view.Menu): Boolean {
+        menu.findItem(MENU_TOGGLE)?.setTitle(
+            if (settings.isRecorderEnabled()) R.string.btn_stop else R.string.btn_start,
+        )
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean = when (item.itemId) {
+        MENU_TOGGLE -> { onToggleClicked(); true }
+        MENU_TEST -> {
+            if (testRecorder == null) startTestRecording() else stopTestRecording()
+            true
         }
-        menu.show()
+        MENU_SHARE -> { shareAll(); true }
+        MENU_UPDATE -> { checkForUpdates(); true }
+        MENU_SETTINGS -> { startActivity(Intent(this, SettingsActivity::class.java)); true }
+        else -> super.onOptionsItemSelected(item)
     }
 
     private fun onToggleClicked() {
@@ -161,15 +160,8 @@ class MainActivity : AppCompatActivity() {
     // ------------------------------------------------------------- recordings
 
     private fun refresh() {
-        val granted = hasPermissions()
-        statusValue.text = when {
-            !granted -> getString(R.string.status_permissions_missing)
-            settings.isRecorderEnabled() -> getString(R.string.status_ready)
-            else -> getString(R.string.status_disabled)
-        }
-        btnToggleService.setText(
-            if (settings.isRecorderEnabled()) R.string.btn_stop else R.string.btn_start,
-        )
+        storageText.text = freeSpaceText()
+        invalidateOptionsMenu()
         buildList(collectLocal())
         ioExecutor.execute {
             val external = try {
@@ -192,29 +184,54 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildRow(item: Item): View {
+        val playing = playingKey == item.key
         val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 20, 16, 20)
+            isClickable = true
+            setOnClickListener { togglePlay(item) }
+        }
+
+        val line1 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding(48, 24, 32, 24)
         }
-        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        column.addView(TextView(this).apply {
+        line1.addView(TextView(this).apply {
             text = item.name
-            textSize = 16f
+            textSize = 18f
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
-        column.addView(TextView(this).apply {
-            text = item.detail
+        line1.addView(TextView(this).apply {
+            text = if (playing) "\u25A0" else "\u25B6"
+            textSize = 14f
+            setPadding(12, 0, 0, 0)
+        })
+        row.addView(line1)
+
+        val line2 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, 6, 0, 0)
+        }
+        line2.addView(View(this).apply {
+            setBackgroundColor(0xFF00C853.toInt())
+            layoutParams = LinearLayout.LayoutParams(14, 14).apply { marginEnd = 12 }
+        })
+        line2.addView(TextView(this).apply {
+            text = item.date
+            textSize = 12f
+            setTextColor(0xFF888888.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        line2.addView(TextView(this).apply {
+            text = item.size
             textSize = 12f
             setTextColor(0xFF888888.toInt())
         })
-        column.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        row.addView(column)
+        row.addView(line2)
 
-        val isPlaying = playingKey == item.key
-        row.addView(Button(this).apply {
-            text = if (isPlaying) "■" else "▶"
-            setOnClickListener { togglePlay(item) }
-        })
         return row
     }
 
@@ -225,7 +242,8 @@ class MainActivity : AppCompatActivity() {
             Item(
                 key = file.absolutePath,
                 name = file.name,
-                detail = describe(file.length(), file.lastModified()),
+                date = describeDate(file.lastModified()),
+                size = describeSize(file.length()),
                 file = file,
                 uri = null,
             )
@@ -266,7 +284,8 @@ class MainActivity : AppCompatActivity() {
                         Item(
                             key = uri.toString(),
                             name = name,
-                            detail = describe(size, modified),
+                            date = describeDate(modified),
+                            size = describeSize(size),
                             file = null,
                             uri = uri,
                         ),
@@ -277,11 +296,22 @@ class MainActivity : AppCompatActivity() {
         return results
     }
 
-    private fun describe(size: Long, modified: Long): String {
+    private fun describeDate(modified: Long): String =
+        SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.US).format(Date(modified))
+
+    private fun describeSize(size: Long): String {
         val kb = size / 1024
-        val sizeText = if (kb > 1024) String.format(Locale.US, "%.1f MB", kb / 1024.0) else "$kb kB"
-        val stamp = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.US).format(Date(modified))
-        return "$stamp  ·  $sizeText"
+        return if (kb > 1024) String.format(Locale.US, "%.1f MB", kb / 1024.0) else "$kb kB"
+    }
+
+    private fun freeSpaceText(): String {
+        return try {
+            val stat = android.os.StatFs(filesDir.absolutePath)
+            val freeGb = stat.availableBytes / (1024.0 * 1024.0 * 1024.0)
+            String.format(Locale.US, "%.1f GB free", freeGb)
+        } catch (_: Exception) {
+            ""
+        }
     }
 
     private fun togglePlay(item: Item) {
@@ -481,7 +511,6 @@ class MainActivity : AppCompatActivity() {
     // ---------------------------------------------------------- test recording
 
     private fun startTestRecording() {
-        btnTestRecording.isEnabled = false
         try {
             val dir = File(filesDir, "recordings").apply { mkdirs() }
             val stamp = SimpleDateFormat("yyyy-MM-dd_HHmmss", Locale.US).format(Date())
@@ -490,14 +519,11 @@ class MainActivity : AppCompatActivity() {
             recorder.start(settings.load().copy(format = RecordingFormat.WAV_PCM), file)
             testRecorder = recorder
             testFile = file
-            btnTestRecording.setText(R.string.test_recording_stop)
             toast(getString(R.string.notification_recording))
             handler.postDelayed({ stopTestRecording() }, 5000)
         } catch (e: Exception) {
             toast(getString(R.string.test_recording_failed) + ": " + (e.message ?: ""))
             testRecorder = null
-        } finally {
-            btnTestRecording.isEnabled = true
         }
     }
 
@@ -509,8 +535,6 @@ class MainActivity : AppCompatActivity() {
             recorder.stop()
         } catch (_: Exception) {
         }
-        btnTestRecording.setText(R.string.test_recording_short)
-        btnTestRecording.isEnabled = true
         testFile = null
         refresh()
     }
@@ -570,5 +594,10 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val PERMISSION_REQUEST_CODE = 1001
+        private const val MENU_TOGGLE = 1
+        private const val MENU_TEST = 2
+        private const val MENU_SHARE = 3
+        private const val MENU_UPDATE = 4
+        private const val MENU_SETTINGS = 5
     }
 }
