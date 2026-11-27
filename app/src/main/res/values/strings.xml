@@ -66,6 +66,11 @@
     <string name="test_recording_short">Test 5s</string>
     <string name="menu_settings">Settings</string>
     <string name="menu_share_all">Share all</string>
+    <string name="menu_check_updates">Check for updates</string>
+    <string name="updates_install">Install</string>
+    <string name="updates_downloading">Downloading update…</string>
+    <string name="updates_no_apk">This release has no APK attached. Opening the release page instead.</string>
+    <string name="updates_allow_install">Allow installing apps from this app, then tap Check for updates again.</string>
     <string name="recordings_external">Recordings on this phone</string>
     <string name="test_recording_stop">Stop test recording</string>
     <string name="test_recording_saved">Saved</string>

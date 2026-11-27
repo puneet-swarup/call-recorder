@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import com.callrecorder.model.RecordingFormat
 import com.callrecorder.recorder.MediaRecorderAudioRecorder
 import com.callrecorder.settings.SettingsRepository
+import com.callrecorder.update.UpdateChecker
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -98,6 +99,7 @@ class MainActivity : AppCompatActivity() {
         val menu = PopupMenu(this, btnSettings)
         menu.menu.add(0, 1, 0, getString(R.string.menu_settings))
         menu.menu.add(0, 2, 1, getString(R.string.menu_share_all))
+        menu.menu.add(0, 3, 2, getString(R.string.menu_check_updates))
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 1 -> {
@@ -106,6 +108,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 2 -> {
                     shareAll()
+                    true
+                }
+                3 -> {
+                    checkForUpdates()
                     true
                 }
                 else -> false
@@ -337,6 +343,138 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent.createChooser(intent, getString(R.string.sharing_title)))
         } catch (_: Exception) {
             toast(getString(R.string.sharing_no_app))
+        }
+    }
+
+    // ------------------------------------------------------------------ updates
+
+    private fun checkForUpdates() {
+        toast(getString(R.string.updates_checking))
+        ioExecutor.execute {
+            val fetcher = UpdateChecker.Fetcher { url: String -> httpGet(url) }
+            val result = try {
+                UpdateChecker(BuildConfig.VERSION_NAME, fetcher).check()
+            } catch (e: Exception) {
+                UpdateChecker.Result.Failure(e.message ?: "unknown")
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                when (result) {
+                    is UpdateChecker.Result.UpdateAvailable -> offerUpdate(result)
+                    is UpdateChecker.Result.UpToDate ->
+                        toast(getString(R.string.updates_up_to_date))
+                    is UpdateChecker.Result.NoReleases ->
+                        toast(getString(R.string.updates_no_releases))
+                    is UpdateChecker.Result.Failure ->
+                        toast(getString(R.string.updates_error) + " " + result.reason)
+                }
+            }
+        }
+    }
+
+    private fun offerUpdate(update: UpdateChecker.Result.UpdateAvailable) {
+        val message = if (update.apkUrl == null) {
+            getString(R.string.updates_available, update.latestVersion) + "\n" +
+                getString(R.string.updates_no_apk)
+        } else {
+            getString(R.string.updates_available, update.latestVersion)
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.notification_title)
+            .setMessage(message)
+            .setPositiveButton(R.string.updates_install) { _, _ ->
+                if (update.apkUrl != null) downloadAndInstall(update.apkUrl) else openUrl(update.releaseUrl)
+            }
+            .setNegativeButton(R.string.accessibility_later, null)
+            .show()
+    }
+
+    private fun downloadAndInstall(url: String) {
+        toast(getString(R.string.updates_downloading))
+        ioExecutor.execute {
+            val file = try {
+                val dir = File(cacheDir, "updates").apply { mkdirs() }
+                val target = File(dir, "call-recorder-update.apk")
+                val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 30_000
+                connection.instanceFollowRedirects = true
+                connection.setRequestProperty("User-Agent", "call-recorder")
+                connection.inputStream.use { input ->
+                    target.outputStream().use { output -> input.copyTo(output) }
+                }
+                connection.disconnect()
+                target
+            } catch (e: Exception) {
+                runOnUiThread { toast(getString(R.string.updates_error) + " " + (e.message ?: "")) }
+                return@execute
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                launchInstaller(file)
+            }
+        }
+    }
+
+    /**
+     * Android will not install an APK without the user turning on "install unknown
+     * apps" for this app, so ask for that first and come back.
+     */
+    private fun launchInstaller(file: File) {
+        if (android.os.Build.VERSION.SDK_INT >= 26 &&
+            !packageManager.canRequestPackageInstalls()
+        ) {
+            toast(getString(R.string.updates_allow_install))
+            try {
+                startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + packageName),
+                    ),
+                )
+            } catch (_: Exception) {
+                toast(getString(R.string.updates_error))
+            }
+            return
+        }
+        try {
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                packageName + ".recordings",
+                file,
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            toast(getString(R.string.updates_error) + " " + (e.message ?: ""))
+        }
+    }
+
+    private fun openUrl(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: Exception) {
+            toast(getString(R.string.updates_error))
+        }
+    }
+
+    private fun httpGet(url: String): String {
+        val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.setRequestProperty("Accept", "application/vnd.github+json")
+        connection.setRequestProperty("User-Agent", "call-recorder")
+        connection.connectTimeout = 10_000
+        connection.readTimeout = 10_000
+        return try {
+            val code = connection.responseCode
+            if (code !in 200..299) throw IllegalStateException("HTTP " + code)
+            connection.inputStream.bufferedReader().use { it.readText() }
+        } finally {
+            connection.disconnect()
         }
     }
 
