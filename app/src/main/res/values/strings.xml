@@ -63,6 +63,10 @@
     <string name="settings_back">\u2190 Back</string>
     <string name="settings_button_close">Done</string>
     <string name="test_recording">Test recording (5 seconds)</string>
+    <string name="test_recording_short">Test 5s</string>
+    <string name="menu_settings">Settings</string>
+    <string name="menu_share_all">Share all</string>
+    <string name="recordings_external">Recordings on this phone</string>
     <string name="test_recording_stop">Stop test recording</string>
     <string name="test_recording_saved">Saved</string>
     <string name="test_recording_failed">Test recording failed</string>
