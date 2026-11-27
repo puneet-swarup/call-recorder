@@ -199,6 +199,7 @@ class MainActivity : AppCompatActivity() {
         line1.addView(TextView(this).apply {
             text = item.name
             textSize = 18f
+            setTextColor(0xFF1A1A1A.toInt())
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
