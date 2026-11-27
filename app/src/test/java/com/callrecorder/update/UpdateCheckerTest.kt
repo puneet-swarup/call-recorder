@@ -1,11 +1,11 @@
-﻿package com.callrecorder.update
+package com.callrecorder.update
 
 import org.junit.Assert
 import org.junit.Test
 
 class UpdateCheckerTest {
 
-    private fun checker(current: Int, body: String = "", error: Exception? = null): UpdateChecker {
+    private fun checker(current: String, body: String = "", error: Exception? = null): UpdateChecker {
         val fetcher = UpdateChecker.Fetcher { _: String ->
             if (error != null) throw error
             body
@@ -22,7 +22,7 @@ class UpdateCheckerTest {
 
     @Test
     fun newerVersionReturnsUpdateAvailable() {
-        val result = checker(current = 10100, body = releaseJson).check()
+        val result = checker(current = "1.1.0", body = releaseJson).check()
         Assert.assertTrue(result is UpdateChecker.Result.UpdateAvailable)
         val update = result as UpdateChecker.Result.UpdateAvailable
         Assert.assertEquals("1.2.0", update.latestVersion)
@@ -32,21 +32,21 @@ class UpdateCheckerTest {
 
     @Test
     fun sameVersionReturnsUpToDate() {
-        val result = checker(current = 10200, body = releaseJson).check()
+        val result = checker(current = "1.2.0", body = releaseJson).check()
         Assert.assertTrue(result is UpdateChecker.Result.UpToDate)
         Assert.assertEquals("1.2.0", (result as UpdateChecker.Result.UpToDate).latestVersion)
     }
 
     @Test
     fun olderReleaseReturnsUpToDate() {
-        val result = checker(current = 20000, body = releaseJson).check()
+        val result = checker(current = "2.0.0", body = releaseJson).check()
         Assert.assertTrue(result is UpdateChecker.Result.UpToDate)
     }
 
     @Test
     fun missingAssetsStillReportsUpdate() {
         val body = "{\"tag_name\":\"v1.5.0\",\"html_url\":\"https://example.test/rel\"}"
-        val result = checker(current = 10200, body = body).check()
+        val result = checker(current = "1.2.0", body = body).check()
         Assert.assertTrue(result is UpdateChecker.Result.UpdateAvailable)
         val update = result as UpdateChecker.Result.UpdateAvailable
         Assert.assertNull(update.apkUrl)
@@ -55,21 +55,27 @@ class UpdateCheckerTest {
 
     @Test
     fun malformedJsonReturnsFailure() {
-        val result = checker(current = 1, body = "not json at all").check()
+        val result = checker(current = "0.0.1", body = "not json at all").check()
         Assert.assertTrue(result is UpdateChecker.Result.Failure)
     }
 
     @Test
     fun emptyBodyReturnsFailure() {
-        val result = checker(current = 1, body = "   ").check()
+        val result = checker(current = "0.0.1", body = "   ").check()
         Assert.assertTrue(result is UpdateChecker.Result.Failure)
     }
 
     @Test
     fun networkErrorReturnsFailure() {
-        val result = checker(current = 1, error = RuntimeException("boom")).check()
+        val result = checker(current = "0.0.1", error = RuntimeException("boom")).check()
         Assert.assertTrue(result is UpdateChecker.Result.Failure)
         Assert.assertTrue((result as UpdateChecker.Result.Failure).reason.contains("Network error"))
+    }
+
+    @Test
+    fun missingReleaseReturnsNoReleases() {
+        val result = checker(current = "1.2.0", error = IllegalStateException("HTTP 404")).check()
+        Assert.assertTrue(result is UpdateChecker.Result.NoReleases)
     }
 
     @Test
