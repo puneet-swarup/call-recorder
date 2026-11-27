@@ -58,7 +58,9 @@ class UpdateChecker(
         ASSET_NAME.findAll(body).forEach { match ->
             val name = match.groupValues[1]
             val start = match.range.last + 1
-            val slice = body.substring(start, minOf(body.length, start + 400))
+            // GitHub puts browser_download_url roughly 1.5 kB after the asset
+            // name (uploader block in between), so a small window misses it.
+            val slice = body.substring(start, minOf(body.length, start + 4000))
             val url = extractString(slice, "browser_download_url")
             if (url != null) {
                 when {
